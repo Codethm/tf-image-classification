@@ -1,9 +1,10 @@
-from utils import *
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import learn
+from tensorflow.contrib import layers
 from tensorflow.contrib.learn import *
 from tensorflow.contrib.learn.python.learn.estimators import model_fn as model_fn_lib
+
 
 def cnn_model_fn(features, labels, mode, params):
     """
@@ -15,7 +16,7 @@ def cnn_model_fn(features, labels, mode, params):
     :param params: dict of hyperparameters
     :return: predictions, loss, train_op, Optional(eval_op). See `model_fn_lib.ModelFnOps`
     """
-
+    
     # Convolutional Layer #1
     conv1 = tf.layers.conv2d(
         inputs=features,
@@ -26,7 +27,7 @@ def cnn_model_fn(features, labels, mode, params):
 
     # Pooling Layer #1
     pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
-
+    
     # Convolutional Layer #2 and Pooling Layer #2
     conv2 = tf.layers.conv2d(
         inputs=pool1,
@@ -44,24 +45,26 @@ def cnn_model_fn(features, labels, mode, params):
         padding="same",
         activation=tf.nn.relu)
     pool3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=[2, 2], strides=2)
-
+    
     # Dense Layer
     pool_flat = tf.reshape(pool3, [-1, 32 * 32 * 64])
     dense = tf.layers.dense(inputs=pool_flat, units=512, activation=tf.nn.relu)
-    dropout = tf.layers.dropout(inputs=dense, rate=params['drop_out_rate'], training=mode == learn.ModeKeys.TRAIN)
-
-    # Logits Layer
+    dropout = tf.layers.dropout(inputs=dense, rate=params['drop_out_rate']
+                                , training=mode == learn.ModeKeys.TRAIN)
+    
+    # Logits Layer, a final layer before applying softmax
     logits = tf.layers.dense(inputs=dropout, units=17)
-
+    
     loss = None
     train_op = None
-
+    
     # Calculate Loss (for both TRAIN and EVAL modes)
     if mode != learn.ModeKeys.INFER:
         onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=17, name="onehot")
+        #cross entropy loss
         loss = tf.losses.softmax_cross_entropy(
             onehot_labels=onehot_labels, logits=logits)
-
+        
     # Configure the Training Op (for TRAIN mode)
     if mode == learn.ModeKeys.TRAIN:
         train_op = tf.contrib.layers.optimize_loss(
@@ -75,6 +78,7 @@ def cnn_model_fn(features, labels, mode, params):
                 "gradients",
                 "gradient_norm",
             ])
+    
     # Generate Predictions
     predictions = {
         "classes": tf.argmax(
@@ -82,10 +86,13 @@ def cnn_model_fn(features, labels, mode, params):
         "probabilities": tf.nn.softmax(
             logits, name="softmax_tensor")
     }
-
+    
     # Return a ModelFnOps object
-    return model_fn_lib.ModelFnOps(
-        mode=mode, predictions=predictions, loss=loss, train_op=train_op, eval_metric_ops={'dense': dense})
+    return model_fn_lib.ModelFnOps(mode=mode,
+                                   predictions=predictions,
+                                   loss=loss, 
+                                   train_op=train_op)
+
 
 def feature_engineering_fn(features, labels):
     """
@@ -94,45 +101,29 @@ def feature_engineering_fn(features, labels):
                               returns features and labels which will be fed
                               into `model_fn`
     """
-
+    
     features = tf.to_float(features)
-
+    
     # Preprocessing or Data Augmentation
     # tf.image implements most of the standard image augmentation
 
     # Example
     # Subtract off the mean and divide by the variance of the pixels.
     features = tf.map_fn(tf.image.per_image_standardization, features)
-
+    
     return features, labels
 
-
-if __name__ == '__main__':
-    params = {'drop_out_rate': 0.2, 'learning_rate': 0.0001}
-    cnn_classifier = learn.Estimator(
-        model_fn=cnn_model_fn, model_dir="_model/plain_cnn",
-        config=RunConfig(save_summary_steps=10, keep_checkpoint_max=2, save_checkpoints_secs=30),
+run_config = RunConfig(save_summary_steps=10, keep_checkpoint_max=2, save_checkpoints_secs=30)
+#drop_out_rate = 0.2, learning_rate = 0.0001
+params = {'drop_out_rate': 0.2, 'learning_rate': 0.0001}
+#use "model/plain_cnn" as model_dir
+cnn_classifier = learn.Estimator(model_fn=cnn_model_fn, model_dir="_model/plain_cnn",
+        config=run_config,
         feature_engineering_fn=feature_engineering_fn, params=params)
 
-    # Configure the accuracy metric for evaluation
-    metrics = {
-        "accuracy":
-            learn.MetricSpec(
-                metric_fn=tf.metrics.accuracy, prediction_key="classes"),
-    }
+predict_input_fn = read_img(data_dir='data/predict', batch_size=1, shuffle=False)
+cnn_result = cnn_classifier.predict(input_fn=predict_input_fn)
 
-    train_input_fn = read_img(data_dir='data/train', batch_size=32, shuffle=True)
-    monitor_input_fn = read_img(data_dir='data/validate', batch_size=128, shuffle=True)
-    test_input_fn = read_img(data_dir='data/test', batch_size=512, shuffle=False)
-
-    validation_monitor = monitors.ValidationMonitor(input_fn=monitor_input_fn,
-                                                    eval_steps=10,
-                                                    every_n_steps=50,
-                                                    metrics=metrics,
-                                                    name='validation')
-
-    #cnn_classifier.fit(input_fn=train_input_fn, steps=300, monitors=[validation_monitor])
-
-    # Evaluate the _model and print results
-    eval_results = cnn_classifier.evaluate(input_fn=test_input_fn, metrics=metrics, steps=1)
-    np.save(os.getcwd() + '/embedding.npy', eval_results['dense'])
+import itertools
+predictions = list(itertools.islice(cnn_result, 1))
+print (predictions)

@@ -52,7 +52,7 @@ for idx, p in enumerate(image_pix):
 
 plt.imshow(result)
 
-classes_map = {0: 'env', 1: 'food', 2: 'front', 3: 'menu', 4: 'profile'}
+classes_map = {0: 'Bluebell', 1: 'Buttercup', 2: 'ColtsFoot', 3: 'Cowslip', 4: 'Crocus', 5: 'Daffodil', 6: 'Daisy', 7: 'Dandetion', 8: 'Fritillary', 9: "Iris", 10: 'LilyValley', 11: 'Pansy', 12: 'Snowdrop', 13: 'Sunflower', 14: 'Tigerlily', 15: 'Tulip', 16: 'Windflower'}
 
 io.imsave(os.getcwd() + '/misc/sprite_valid.jpg', result)
 label_df = pd.DataFrame(list(map(lambda x: classes_map[x], label_val)), columns=['label'])

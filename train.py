@@ -5,8 +5,6 @@ from tensorflow.contrib import learn
 from tensorflow.contrib.learn import *
 from tensorflow.contrib.learn.python.learn.estimators import model_fn as model_fn_lib
 
-
-
 def cnn_model_fn(features, labels, mode, params):
     """
     Model function for CNN

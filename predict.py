@@ -4,6 +4,8 @@ from tensorflow.contrib import learn
 from tensorflow.contrib import layers
 from tensorflow.contrib.learn import *
 from tensorflow.contrib.learn.python.learn.estimators import model_fn as model_fn_lib
+from utils import *
+import itertools
 
 
 def cnn_model_fn(features, labels, mode, params):
@@ -124,6 +126,14 @@ cnn_classifier = learn.Estimator(model_fn=cnn_model_fn, model_dir="_model/plain_
 predict_input_fn = read_img(data_dir='data/predict', batch_size=1, shuffle=False)
 cnn_result = cnn_classifier.predict(input_fn=predict_input_fn)
 
-import itertools
 predictions = list(itertools.islice(cnn_result, 1))
-print (predictions)
+result = predictions[0]
+
+
+print("result = " + str(result['classes']))
+loop = result['probabilities']
+c = 0
+for i in loop:
+    print(str(c)+" probability: " + format(i, '.8f'))
+    c += 1
+    
